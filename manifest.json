@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "LOTO6 購入入力補助",
+  "version": "1.0.0",
+  "description": "selectloto.jp の組み合わせを宝くじ公式サイトへ自動入力します",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://selectloto.jp/*",
+    "https://staging.selectloto.jp/*",
+    "https://*.mizuhobank.co.jp/*",
+    "https://*.takarakuji-official.jp/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LOTO6 購入入力補助"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://selectloto.jp/*",
+        "https://staging.selectloto.jp/*"
+      ],
+      "js": ["content_selectloto.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://*.mizuhobank.co.jp/*",
+        "https://*.takarakuji-official.jp/*"
+      ],
+      "js": ["content_loto_official.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
