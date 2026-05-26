@@ -27,6 +27,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  if (result.error === 'drawn') {
+    content.innerHTML =
+      '<div class="msg error">この抽せん回はすでに抽選済みです。<br>未抽選の回のページで開いてください。</div>';
+    return;
+  }
+
   const { drawRound, combinations } = result;
 
   if (!combinations || combinations.length === 0) {

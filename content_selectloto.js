@@ -3,7 +3,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type !== 'GET_COMBINATIONS') return;
 
   // このフレームにテーブルがなければ応答しない（親フレームの誤応答を防ぐ）
-  if (!document.getElementById('combinationTable')) return;
+  const table = document.getElementById('combinationTable');
+  if (!table) return;
+
+  // 抽選済みの回は自動入力不可
+  if (table.dataset.undrawn === '0') {
+    sendResponse({ error: 'drawn' });
+    return true;
+  }
 
   const drawRound = new URLSearchParams(location.search).get('draw_round') || '';
   const rows = document.querySelectorAll('#combinationTable tbody tr');
