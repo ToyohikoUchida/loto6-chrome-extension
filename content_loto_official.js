@@ -18,7 +18,14 @@ const AUTOFILL_KEY = 'loto6_autofill';
     return;
   }
 
-  // ② LOTO6入力ページ検出
+  // ② ECトップページ検出（glonaviLoto6Form がある → LOTO6購入ページへ自動遷移）
+  const loto6Form = document.getElementById('glonaviLoto6Form');
+  if (loto6Form) {
+    await handleEcTopPage(autofill, loto6Form);
+    return;
+  }
+
+  // ③ LOTO6入力ページ検出
   try {
     await waitForElement('.m_lotteryNumInputNum_btn', 8000);
   } catch {
@@ -82,6 +89,19 @@ async function handleConfirmationPage(autofill, continueBtn) {
   });
   await delay(1500);
   continueBtn.click();
+}
+
+async function handleEcTopPage(autofill, loto6Form) {
+  const remaining = autofill.combinations.length - (autofill.currentIndex ?? 0);
+  const statusUI = createStatusUI();
+  document.body.appendChild(statusUI);
+  setStatus(statusUI, `残り${remaining}組 → LOTO6購入ページへ移動します`, 'active');
+
+  await chrome.storage.local.set({
+    [AUTOFILL_KEY]: { ...autofill, timestamp: Date.now() }
+  });
+  await delay(1200);
+  loto6Form.submit();
 }
 
 function showPendingNotice(autofill) {
