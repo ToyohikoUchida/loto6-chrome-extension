@@ -1,5 +1,6 @@
 const BATCH_SIZE = 25;
 const AUTOFILL_KEY = 'loto6_autofill';
+let autofillCancelled = false;
 
 (async () => {
   const stored = await chrome.storage.local.get(AUTOFILL_KEY);
@@ -18,22 +19,41 @@ const AUTOFILL_KEY = 'loto6_autofill';
     return;
   }
 
-  // ② ECトップページ検出（glonaviLoto6Form がある → LOTO6購入ページへ自動遷移）
+  // ② LOTO6入力ページ検出（glonaviLoto6Form はナビにも存在するため先に確認）
+  const isInputPage = await waitForElement('.m_lotteryNumInputNum_btn', 3000)
+    .then(() => true).catch(() => false);
+
+  if (isInputPage) {
+    // バッチ2以降で前バッチのパネルが復元されている場合、最初のパネル以外がアクティブになる
+    // → glonaviLoto6Form で新しい入力ページへ移動してリセット
+    if ((autofill.currentIndex ?? 0) > 0) {
+      const panels = [...document.querySelectorAll('.m_lotteryNumBodyItemWrap')];
+      const activePanel = getActivePanel();
+      const activeIndex = activePanel ? panels.indexOf(activePanel) : 0;
+      if (activeIndex > 0) {
+        const loto6Form = document.getElementById('glonaviLoto6Form');
+        if (loto6Form) {
+          const ui = createStatusUI();
+          document.body.appendChild(ui);
+          setStatus(ui, '入力ページをリセット中…', 'active');
+          await delay(1000);
+          loto6Form.submit();
+          return;
+        }
+      }
+    }
+    await handleInputPage(autofill);
+    return;
+  }
+
+  // ③ ECトップページ検出（入力ボタンなし ＋ glonaviLoto6Form あり → LOTO6購入ページへ自動遷移）
   const loto6Form = document.getElementById('glonaviLoto6Form');
   if (loto6Form) {
     await handleEcTopPage(autofill, loto6Form);
     return;
   }
 
-  // ③ LOTO6入力ページ検出
-  try {
-    await waitForElement('.m_lotteryNumInputNum_btn', 8000);
-  } catch {
-    showPendingNotice(autofill);
-    return;
-  }
-
-  await handleInputPage(autofill);
+  showPendingNotice(autofill);
 })();
 
 // ===== ページ処理 =====
@@ -41,6 +61,7 @@ const AUTOFILL_KEY = 'loto6_autofill';
 async function handleInputPage(autofill) {
   const currentIndex = autofill.currentIndex ?? 0;
   const total = autofill.combinations.length;
+
   const batch = autofill.combinations.slice(currentIndex, currentIndex + BATCH_SIZE);
 
   const statusUI = createStatusUI();
@@ -48,6 +69,8 @@ async function handleInputPage(autofill) {
 
   try {
     await fillCombinations(batch, currentIndex, total, statusUI);
+
+    if (autofillCancelled) return;
 
     const newIndex = currentIndex + batch.length;
     await chrome.storage.local.set({
@@ -65,7 +88,9 @@ async function handleInputPage(autofill) {
       setStatus(statusUI, '⚠️ 「カートに入れる」が見つかりません。手動でクリックしてください。', 'error');
     }
   } catch (e) {
-    setStatus(statusUI, `⚠️ エラー: ${e.message}`, 'error');
+    if (!autofillCancelled) {
+      setStatus(statusUI, `⚠️ エラー: ${e.message}`, 'error');
+    }
   }
 }
 
@@ -116,6 +141,8 @@ function showPendingNotice(autofill) {
 
 async function fillCombinations(batch, startIndex, total, statusUI) {
   for (let i = 0; i < batch.length; i++) {
+    if (autofillCancelled) return;
+
     const combo = batch[i];
     const globalIdx = startIndex + i + 1;
     setStatus(statusUI, `入力中 ${globalIdx}/${total}組\n[${combo.numbers.join(' ')}] ${combo.kuchiCount}口`, 'active');
@@ -152,14 +179,16 @@ async function fillCombinations(batch, startIndex, total, statusUI) {
       await delay(200);
     }
 
-    // 「次の申込数字へ」か「カートに入れる」のどちらかが有効になるまで待機
-    await waitFor(() => isNextBtnReady(panel) || !!findEnabledButton('カートに入れる'));
+    // 「次の申込数字へ」を2秒以内に試みる（最終パネルは永続的に無効なので検出できる）
+    const nextReady = await waitFor(() => isNextBtnReady(panel), 2000)
+      .then(() => true).catch(() => false);
 
-    if (isNextBtnReady(panel)) {
+    if (nextReady) {
       panel.querySelector('.m_lotteryNumInputForm_btn').click();
       await delay(600);
     } else {
-      // カートに入れるボタンが現れた → ループを抜けて外側でクリック
+      // 「次へ」が2秒以内に有効にならない → 最終パネル：カートを待ってbreak
+      await waitFor(() => !!findEnabledButton('カートに入れる'));
       break;
     }
   }
@@ -219,9 +248,25 @@ function createStatusUI() {
     background: '#fff', border: '2px solid #0b72d9', borderRadius: '10px',
     padding: '12px 16px', fontSize: '13px', fontFamily: 'sans-serif',
     boxShadow: '0 4px 16px rgba(0,0,0,0.2)', maxWidth: '260px',
-    lineHeight: '1.6', whiteSpace: 'pre-wrap',
+    lineHeight: '1.6',
   });
-  div.innerHTML = `<div style="font-weight:bold;margin-bottom:4px;color:#0b72d9;">LOTO6 自動入力補助</div><div id="loto6-status-msg">準備中…</div>`;
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;white-space:normal;">
+      <span style="font-weight:bold;color:#0b72d9;">LOTO6 自動入力補助</span>
+      <span id="loto6-stop-btn" style="display:inline-block;font-size:11px;padding:2px 8px;background:#c00;color:#fff;border-radius:4px;cursor:pointer;user-select:none;line-height:1.6;">停止</span>
+    </div>
+    <div id="loto6-status-msg" style="white-space:pre-wrap;">準備中…</div>
+  `;
+
+  // 停止ボタン：フラグを立ててstorageを消去し、自動入力を完全停止
+  div.querySelector('#loto6-stop-btn').addEventListener('click', async () => {
+    autofillCancelled = true;
+    await chrome.storage.local.remove(AUTOFILL_KEY);
+    setStatus(div, '⛔ 自動入力を停止しました', 'error');
+    const btn = div.querySelector('#loto6-stop-btn');
+    if (btn) { btn.style.opacity = '0.5'; btn.style.cursor = 'default'; btn.onclick = null; }
+  });
+
   return div;
 }
 

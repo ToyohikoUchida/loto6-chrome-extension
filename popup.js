@@ -21,6 +21,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  if (!result) {
+    content.innerHTML =
+      '<div class="msg error">データを読み込めませんでした。<br>ページを再読み込みしてください。</div>';
+    return;
+  }
+
   const { drawRound, combinations } = result;
 
   if (!combinations || combinations.length === 0) {
