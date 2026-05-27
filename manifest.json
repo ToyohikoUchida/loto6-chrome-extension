@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LOTO6 購入入力補助",
-  "version": "1.0.0",
-  "description": "selectloto.jp の組み合わせを宝くじ公式サイトへ自動入力します",
+  "name": "selectLOTO 購入入力補助",
+  "version": "1.1.0",
+  "description": "selectloto.jp の組み合わせ（LOTO6・LOTO7・ミニロト）を宝くじ公式サイトへ自動入力します",
   "permissions": ["storage", "activeTab", "tabs", "scripting"],
   "background": {
     "service_worker": "background.js"
@@ -15,7 +15,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LOTO6 購入入力補助",
+    "default_title": "selectLOTO 購入入力補助",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
