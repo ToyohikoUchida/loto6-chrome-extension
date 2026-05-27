@@ -69,6 +69,10 @@ async function handleInputPage(autofill, statusUI) {
 
   const batch = autofill.combinations.slice(currentIndex, currentIndex + BATCH_SIZE);
 
+  // 入力中は誤操作を防ぐオーバーレイを表示（停止ボタンは statusUI が上に来るので有効）
+  const overlay = createOverlay();
+  document.body.appendChild(overlay);
+
   try {
     await fillCombinations(batch, currentIndex, total, statusUI);
 
@@ -79,7 +83,6 @@ async function handleInputPage(autofill, statusUI) {
       [AUTOFILL_KEY]: { ...autofill, currentIndex: newIndex, timestamp: Date.now() }
     });
 
-    // 「カートに入れる」ボタンを探してクリック
     setStatus(statusUI, `${batch.length}組入力完了。カートに追加中…`, 'active');
     await delay(800);
 
@@ -93,6 +96,8 @@ async function handleInputPage(autofill, statusUI) {
     if (!autofillCancelled) {
       setStatus(statusUI, `⚠️ エラー: ${e.message}`, 'error');
     }
+  } finally {
+    overlay.remove();
   }
 }
 
@@ -103,6 +108,14 @@ async function handleConfirmationPage(autofill, continueBtn, statusUI) {
   if (currentIndex >= total) {
     setStatus(statusUI, `✅ 全${total}組の入力完了！\nお支払い内容のご確認へ進んでください。`, 'done');
     await chrome.storage.local.remove(AUTOFILL_KEY);
+    const stopBtn = statusUI.querySelector('#loto6-stop-btn');
+    if (stopBtn) {
+      stopBtn.textContent = '閉じる';
+      stopBtn.style.background = '#555';
+      stopBtn.style.opacity = '1';
+      stopBtn.style.cursor = 'pointer';
+      stopBtn.onclick = () => statusUI.remove();
+    }
     return;
   }
 
@@ -269,6 +282,16 @@ function setStatus(ui, msg, state) {
   const el = ui.querySelector('#loto6-status-msg');
   if (el) el.textContent = msg;
   ui.style.borderColor = { done: '#080', error: '#c00', active: '#0b72d9' }[state] || '#0b72d9';
+}
+
+function createOverlay() {
+  const div = document.createElement('div');
+  div.id = 'loto6-input-overlay';
+  Object.assign(div.style, {
+    position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+    zIndex: '99998', background: 'rgba(0,0,0,0.15)', cursor: 'not-allowed',
+  });
+  return div;
 }
 
 // ===== CSP回避クリック（javascript: URL ブロック対策）=====
