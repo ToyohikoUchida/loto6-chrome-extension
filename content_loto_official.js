@@ -12,10 +12,17 @@ let autofillCancelled = false;
     return;
   }
 
+  // ページ遷移直後に即座にUIを表示（検出前に表示することで消灯時間を最小化）
+  const statusUI = createStatusUI();
+  document.body.appendChild(statusUI);
+  const ci = autofill.currentIndex ?? 0;
+  const tot = autofill.combinations.length;
+  setStatus(statusUI, ci > 0 ? `処理継続中… ${ci}/${tot}組完了` : '準備中…', 'active');
+
   // ① 確認ページ検出（「買い物を続ける」ボタンがある）
   const continueBtn = document.querySelector('[opename="買い物を続ける"]');
   if (continueBtn) {
-    await handleConfirmationPage(autofill, continueBtn);
+    await handleConfirmationPage(autofill, continueBtn, statusUI);
     return;
   }
 
@@ -33,39 +40,34 @@ let autofillCancelled = false;
       if (activeIndex > 0) {
         const loto6Form = document.getElementById('glonaviLoto6Form');
         if (loto6Form) {
-          const ui = createStatusUI();
-          document.body.appendChild(ui);
-          setStatus(ui, '入力ページをリセット中…', 'active');
+          setStatus(statusUI, '入力ページをリセット中…', 'active');
           await delay(1000);
           loto6Form.submit();
           return;
         }
       }
     }
-    await handleInputPage(autofill);
+    await handleInputPage(autofill, statusUI);
     return;
   }
 
   // ③ ECトップページ検出（入力ボタンなし ＋ glonaviLoto6Form あり → LOTO6購入ページへ自動遷移）
   const loto6Form = document.getElementById('glonaviLoto6Form');
   if (loto6Form) {
-    await handleEcTopPage(autofill, loto6Form);
+    await handleEcTopPage(autofill, loto6Form, statusUI);
     return;
   }
 
-  showPendingNotice(autofill);
+  showPendingNotice(autofill, statusUI);
 })();
 
 // ===== ページ処理 =====
 
-async function handleInputPage(autofill) {
+async function handleInputPage(autofill, statusUI) {
   const currentIndex = autofill.currentIndex ?? 0;
   const total = autofill.combinations.length;
 
   const batch = autofill.combinations.slice(currentIndex, currentIndex + BATCH_SIZE);
-
-  const statusUI = createStatusUI();
-  document.body.appendChild(statusUI);
 
   try {
     await fillCombinations(batch, currentIndex, total, statusUI);
@@ -94,12 +96,9 @@ async function handleInputPage(autofill) {
   }
 }
 
-async function handleConfirmationPage(autofill, continueBtn) {
+async function handleConfirmationPage(autofill, continueBtn, statusUI) {
   const currentIndex = autofill.currentIndex ?? 0;
   const total = autofill.combinations.length;
-
-  const statusUI = createStatusUI();
-  document.body.appendChild(statusUI);
 
   if (currentIndex >= total) {
     setStatus(statusUI, `✅ 全${total}組の入力完了！\nお支払い内容のご確認へ進んでください。`, 'done');
@@ -116,10 +115,8 @@ async function handleConfirmationPage(autofill, continueBtn) {
   continueBtn.click();
 }
 
-async function handleEcTopPage(autofill, loto6Form) {
+async function handleEcTopPage(autofill, loto6Form, statusUI) {
   const remaining = autofill.combinations.length - (autofill.currentIndex ?? 0);
-  const statusUI = createStatusUI();
-  document.body.appendChild(statusUI);
   setStatus(statusUI, `残り${remaining}組 → LOTO6購入ページへ移動します`, 'active');
 
   await chrome.storage.local.set({
@@ -129,12 +126,10 @@ async function handleEcTopPage(autofill, loto6Form) {
   loto6Form.submit();
 }
 
-function showPendingNotice(autofill) {
+function showPendingNotice(autofill, statusUI) {
   const remaining = autofill.combinations.length - (autofill.currentIndex ?? 0);
   if (remaining <= 0) return;
-  const ui = createStatusUI();
-  document.body.appendChild(ui);
-  setStatus(ui, `残り${remaining}組があります。\nLOTO6購入ページを開くと\n自動で入力を再開します。`, 'active');
+  setStatus(statusUI, `残り${remaining}組があります。\nLOTO6購入ページを開くと\n自動で入力を再開します。`, 'active');
 }
 
 // ===== 組み合わせ入力 =====
