@@ -189,7 +189,7 @@ async function fillCombinations(batch, startIndex, total, statusUI) {
         }
       }
       if (!clicked) throw new Error(`数字 ${num} のボタンが見つかりません`);
-      await delay(150);
+      await delay(200);
     }
 
     // 口数を設定
@@ -202,7 +202,7 @@ async function fillCombinations(batch, startIndex, total, statusUI) {
     }
 
     // 「次の申込数字へ」を2秒以内に試みる（最終パネルは永続的に無効なので検出できる）
-    const nextReady = await waitFor(() => isNextBtnReady(panel), 2000)
+    const nextReady = await waitFor(() => isNextBtnReady(panel), 5000)
       .then(() => true).catch(() => false);
 
     if (nextReady) {
