@@ -87,6 +87,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // 抽せん回確認ダイアログを表示
+    const confirmed = await showConfirmDialog(drawRound, selected.length);
+    if (!confirmed) return;
+
     await chrome.storage.local.set({
       selectloto_autofill: {
         lotteryType: lotteryType ?? 'loto6',
@@ -101,3 +105,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('startBtn').disabled = true;
   });
 });
+
+// 抽せん回確認ダイアログ
+function showConfirmDialog(drawRound, count) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <div class="confirm-title">⚠️ 抽せん回の確認</div>
+        <div class="confirm-round">第 ${drawRound} 回</div>
+        <div class="confirm-count">${count}組を公式サイトへ入力します</div>
+        <div class="confirm-note">
+          公式サイトの購入対象回が<br>
+          <strong>第 ${drawRound} 回</strong> であることを<br>
+          確認してから開始してください。
+        </div>
+        <div class="confirm-buttons">
+          <button class="btn-cancel" id="confirmCancel">キャンセル</button>
+          <button class="btn-confirm" id="confirmOk">確認して開始</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('confirmOk').addEventListener('click', () => {
+      overlay.remove();
+      resolve(true);
+    });
+    document.getElementById('confirmCancel').addEventListener('click', () => {
+      overlay.remove();
+      resolve(false);
+    });
+  });
+}
